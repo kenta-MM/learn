@@ -15,14 +15,14 @@
         color="neutral"
         variant="outline"
         />
-      <UButton label="登録" color="primary" @click="openAdd()" />
+      <UButton label="登録" color="primary" @click="isOpenAdd = true" />
     
       <!-- 追加用モーダル -->
       <TodoModal
         v-model:isOpen="isOpenAdd"
         :modelValue="newTodo"
         mode="add"
-        @submit="addTodo"
+        @submit="handleAdd"
       />
     </div> 
 
@@ -31,49 +31,19 @@
       v-model:isOpen="isOpenEdit"
       :modelValue="editTodo"
       mode="edit"
-      @submit="updateTodo"
+      @submit="handleUpdate"
     />
  
-    <!-- Todo一覧 -->
+    <TodoTable
+      v-if="todos.length"
+      :todos="sortedTodos"
+      :sortAsc="sortAsc"
+      @sort="sortBy"
+      @edit="openEdit"
+      @remove="handleRemove"
+    />
     <div v-if="todos.length > 0" class="space-y-2 mt-4">
-      <table class="table-auto w-full border-collapse border border-gray-500 text-center">
-        <thead>
-          <tr>
-            <th class="border border-gray-300 px-4 py-2">やること</th>
-            <th class="border border-gray-300 px-4 py-2">進捗</th>
-            <th @click="sortBy('priority')" class="cursol-pointer border border-gray-300 px-4 py-2">優先度
-              <span>
-                {{  sortAsc? '↑' : '↓' }}
-              </span>
-            </th>
-            <th class="border border-gray-300 px-4 py-2">イベント</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(todo, index) in todos" :key="index" class="border border-gray-500">
-            <td class="border border-gray-500 px-4 py-2">{{ todo.text }}</td>
-            <td class="border border-gray-500 px-4 py-2">{{ todo.status }}</td>
-            <td class="border border-gray-500 px-4 py-2">{{ todo.priority }}</td>
-            <td class="border border-gray-500 px-4 py-2">
-              <!-- ボタンを横並びに -->
-              <div class="flex gap-2 justify-center">
-                <UButton
-                  size="xs"
-                  color="secondary"
-                  label="更新"
-                  @click="openEdit(index)"
-                />
-                <UButton
-                  size="xs"
-                  color="error"
-                  label="削除"
-                  @click="removeTodo(index)"
-                />
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+   
     </div>
     <p v-else class="text-gray-500">まだ Todo はありません。</p>
   </div>
@@ -84,91 +54,45 @@
 import { ref } from 'vue'
 import type { Todo } from '~/types/todo'
 import { DEFAULT_TODO } from '~/types/todo'
+import useTodos from '~/composables/useTodos'
 import TodoModal from '~/components/index/TodoModal.vue'
+import TodoTable from '~/components/TodoTable.vue'
+import { useToast } from '#imports'
 
 const toast = useToast()
-const sortKey = ref<keyof Todo | ''>('')
-const sortAsc = ref(true)
+const { todos, sortAsc, sortBy, sortedTodos, addTodo, updateTodo, removeTodo } = useTodos()  
 
-const newTodo = ref<Todo>({ ...DEFAULT_TODO })
-const editTodo = ref<Todo>({ ...DEFAULT_TODO })
-
-// Todo一覧(メモリ上)
-const { todos } = useLocalStorageTodos()
-
-// モーダルの開閉状態
 const isOpenAdd = ref(false)
 const isOpenEdit = ref(false)
-
-// 編集中のインデックス
+const newTodo = ref<Todo>({ ...DEFAULT_TODO })
+const editTodo = ref<Todo>({ ...DEFAULT_TODO })
 const editIndex = ref<number | null>(null)
 
-// 追加処理
-const addTodo = (todo: Todo) => {
-  todos.value.push(todo)
+const handleAdd  = (todo: Todo) => {
+  addTodo(todo)
   newTodo.value = { ...DEFAULT_TODO }
   isOpenAdd.value = false
-
   toast.add({title: '成功しました！', description: 'TODOを追加しました。',})
 }
-const updateTodo = (todo: Todo) => {
-  todos.value[editIndex.value!] ={
-    text: todo.text.trim(),
-    status: todo.status,
-    priority: todo.priority
+
+const handleUpdate  = (todo: Todo) => {
+  if (editIndex.value === null) {
+    return
   }
-  editIndex.value = null
-  isOpenEdit.value = false
+  updateTodo(editIndex.value, todo)
   toast.add({title: '成功しました！', description: 'TODOを更新しました。',})
+  isOpenEdit.value = false
+  editIndex.value = null
 }
 
-// 削除処理
-const removeTodo = (index: number) => {
-  todos.value.splice(index, 1)
+const handleRemove = (index: number) => {
+  removeTodo(index)
   toast.add({title: '成功しました！', description: 'TODOを削除しました。',})
 }
 
-const openAdd = () => {
-  isOpenAdd.value = true
-}
 const openEdit = (index: number) => {
   editIndex.value = index
   editTodo.value = todos.value[index]!
   isOpenEdit.value = true
 }
-
-const sortBy = (key: 'text' | 'status' | 'priority') => {
-  if (sortKey.value === key) {
-    sortAsc.value = !sortAsc.value
-  } else {
-    sortKey.value = key
-    sortAsc.value = true
-  }
-  todos.value.sort((a, b) => {
-    if (a[key] < b[key]) {
-      return sortAsc.value ? -1 : 1
-    }
-    if (a[key] > b[key]) {
-      return sortAsc.value ? 1 : -1
-    }
-    return 0
-  })
-}
-
-const sortedTodos = computed(() => {
-  if (sortKey.value === '') {
-    return todos.value
-  }
-  return [...todos.value].sort((a, b) => {
-    const key = sortKey.value as keyof Todo
-    if (a[key] < b[key]) {
-      return sortAsc.value ? -1 : 1
-    }
-    if (a[key] > b[key]) {
-      return sortAsc.value ? 1 : -1
-    }
-    return 0
-  })
-})
-
 </script>
