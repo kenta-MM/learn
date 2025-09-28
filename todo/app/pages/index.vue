@@ -15,44 +15,25 @@
         color="neutral"
         variant="outline"
         />
+      <UButton label="登録" color="primary" @click="openAdd()" />
     
       <!-- 追加用モーダル -->
-      <UModal v-model:open="isOpen" title="Todoを追加" description="新しいTodoを追加してください。">
-        <!-- トリガー -->
-        <template #default>
-            <UButton label="登録" color="primary" />
-        </template>
-        <!-- モーダルの中身 -->
-        <template #body>
-          <div class="p-4 space-y-4">
-            <UInput v-model="newTodo.text" placeholder="やることを入力" @keydown.ctrl.enter="addTodo"/>
-            <USelect v-model="newTodo.status" :items="statusOptions" class="mb-2" />
-            <USelect v-model="newTodo.priority" :items="priorityOptions" />
-            <div class="flex justify-end gap-2">
-              <UButton label="キャンセル" color="neutral" @click="isOpen = false" />
-              <UButton label="追加" color="primary" @click="addTodo" />
-            </div>
-          </div>
-        </template>
-      </UModal>
+      <TodoModal
+        v-model:isOpen="isOpenAdd"
+        :modelValue="newTodo"
+        mode="add"
+        @submit="addTodo"
+      />
     </div> 
 
     <!-- 更新用モーダル -->
-    <UModal v-model:open="isOpenEdit" title="Todoを更新" description="内容を更新してください。">
-      <!-- モーダルの中身 -->
-      <template #body>
-        <div class="p-4 space-y-4">
-          <UInput v-model="editTodo.text" placeholder="やることを入力" @keydown.ctrl.enter="updateTodo"/>
-          <USelect v-model="editTodo.status" :items="statusOptions" class="mb-2" />
-          <USelect v-model="editTodo.priority" :items="priorityOptions" />
-          <div class="flex justify-end gap-2">
-            <UButton label="キャンセル" color="neutral" @click="isOpenEdit  = false" />
-            <UButton label="更新" color="primary" @click="updateTodo" />
-          </div>
-        </div>
-      </template>
-    </UModal>
-
+    <TodoModal
+      v-model:isOpen="isOpenEdit"
+      :modelValue="editTodo"
+      mode="edit"
+      @submit="updateTodo"
+    />
+ 
     <!-- Todo一覧 -->
     <div v-if="todos.length > 0" class="space-y-2 mt-4">
       <table class="table-auto w-full border-collapse border border-gray-500 text-center">
@@ -101,11 +82,64 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import type { Todo } from '~/types/todo'
+import { DEFAULT_TODO } from '~/types/todo'
+import TodoModal from '~/components/index/TodoModal.vue'
 
 // TODO: トースト対応
 // const toast = useToast()
 const sortKey = ref<keyof Todo | ''>('')
 const sortAsc = ref(true)
+
+const newTodo = ref<Todo>({ ...DEFAULT_TODO })
+const editTodo = ref<Todo>({ ...DEFAULT_TODO })
+
+// Todo一覧(メモリ上)
+const { todos } = useLocalStorageTodos()
+
+// モーダルの開閉状態
+const isOpenAdd = ref(false)
+const isOpenEdit = ref(false)
+
+// 編集中のインデックス
+const editIndex = ref<number | null>(null)
+
+// 追加処理
+const addTodo = (todo: Todo) => {
+  todos.value.push(todo)
+  newTodo.value = { ...DEFAULT_TODO }
+  isOpenAdd.value = false
+
+  // TODO:トースト通知を出す
+  // toast.add({
+  //   title: '保存しました！',
+  //   description: '新しいTodoが追加されました。',
+  //   icon: 'i-lucide-check-circle-days',
+  // })
+}
+const updateTodo = (todo: Todo) => {
+  todos.value[editIndex.value!] ={
+    text: todo.text.trim(),
+    status: todo.status,
+    priority: todo.priority
+  }
+  editIndex.value = null
+  isOpenEdit.value = false
+}
+
+// 削除処理
+const removeTodo = (index: number) => {
+  todos.value.splice(index, 1)
+}
+
+const openAdd = () => {
+  isOpenAdd.value = true
+}
+const openEdit = (index: number) => {
+  editIndex.value = index
+  editTodo.value = todos.value[index]!
+  isOpenEdit.value = true
+}
 
 const sortBy = (key: 'text' | 'status' | 'priority') => {
   if (sortKey.value === key) {
@@ -140,111 +174,5 @@ const sortedTodos = computed(() => {
     return 0
   })
 })
-
-// モーダルの開閉状態
-const isOpen = ref(false)
-
-// todoインタフェース
-type TodoStatus = '未対応' | '対応中' | '対応完了'
-type TodoPriority = '低' | '中' | '高'
-const statusOptions: TodoStatus[] = ['未対応', '対応中', '対応完了']
-const priorityOptions: TodoPriority[] = ['低', '中', '高']
-
-interface Todo {
-  text: string
-  status: TodoStatus
-  priority: TodoPriority
-}
-
-// 新規追加用
-const newTodo = ref<Todo>({
-  text: '',
-  status: '未対応',
-  priority: '低'
-})
-// Todo一覧(メモリ上)
-const todos = ref<Todo[]>([])
-
-// 起動時に読み込み
-onMounted(() => {
-  const saved = localStorage.getItem('todos')
-  if (saved) {
-    todos.value = JSON.parse(saved)
-  }
-})
-
-// 変更があったら保存
-watch(todos, (newTodos) => {
-  localStorage.setItem('todos', JSON.stringify(newTodos))
-}, { deep: true })
-
-// 追加処理
-const addTodo = () => {
-  if (newTodo.value === null) {
-    return
-  }
-  if (newTodo.value.text.trim() === '') {
-    return
-  }
-  todos.value.push({
-    text: newTodo.value.text.trim(),
-    status: newTodo.value.status,
-    priority: newTodo.value.priority
-  })
-  newTodo.value = {
-    text: '',
-    status: '未対応',
-    priority: '低'
-  }
-  isOpen.value = false
-
-  // TODO:トースト通知を出す
-  // toast.add({
-  //   title: '保存しました！',
-  //   description: '新しいTodoが追加されました。',
-  //   icon: 'i-lucide-check-circle-days',
-  // })
-}
-
-// 削除処理
-const removeTodo = (index: number) => {
-  todos.value.splice(index, 1)
-}
-
-// 更新用
-const isOpenEdit = ref(false)
-const editIndex = ref<number | null>(null)
-const editTodo = ref<Todo>({
-  text: '',
-  status: '未対応',
-  priority: '低'
-})
-const openEdit = (index: number) => {
-  editIndex.value = index
-  editTodo.value = todos.value[index]!
-  isOpenEdit.value = true
-}
-const updateTodo = () => {
-  if (editTodo.value === null) {
-    return
-  }
-  // バリデーションを追加する。
-  if (editTodo.value.text.trim() === '') {
-    return
-  }
-
-  todos.value[editIndex.value!] ={
-    text: editTodo.value.text.trim(),
-    status: editTodo.value.status,
-    priority: editTodo.value.priority
-  }
-    editIndex.value = null
-    newTodo.value = {
-    text: '',
-    status: '未対応',
-    priority: '低'
-  }
-    isOpenEdit.value = false
-}
 
 </script>
