@@ -86,8 +86,7 @@ import type { Todo } from '~/types/todo'
 import { DEFAULT_TODO } from '~/types/todo'
 import TodoModal from '~/components/index/TodoModal.vue'
 
-// TODO: トースト対応
-// const toast = useToast()
+const toast = useToast()
 const sortKey = ref<keyof Todo | ''>('')
 const sortAsc = ref(true)
 
@@ -110,12 +109,7 @@ const addTodo = (todo: Todo) => {
   newTodo.value = { ...DEFAULT_TODO }
   isOpenAdd.value = false
 
-  // TODO:トースト通知を出す
-  // toast.add({
-  //   title: '保存しました！',
-  //   description: '新しいTodoが追加されました。',
-  //   icon: 'i-lucide-check-circle-days',
-  // })
+  toast.add({title: '成功しました！', description: 'TODOを追加しました。',})
 }
 const updateTodo = (todo: Todo) => {
   todos.value[editIndex.value!] ={
@@ -125,11 +119,13 @@ const updateTodo = (todo: Todo) => {
   }
   editIndex.value = null
   isOpenEdit.value = false
+  toast.add({title: '成功しました！', description: 'TODOを更新しました。',})
 }
 
 // 削除処理
 const removeTodo = (index: number) => {
   todos.value.splice(index, 1)
+  toast.add({title: '成功しました！', description: 'TODOを削除しました。',})
 }
 
 const openAdd = () => {
