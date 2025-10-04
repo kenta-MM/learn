@@ -7,8 +7,15 @@
 
         <!-- モーダルの中身 -->
         <template #body>
+            <ul v-if="errors.length > 0">
+                <li v-for="error in errors">
+                    {{ error }}
+                </li>
+
+            </ul>
+
             <div class="p-4 space-y-4">
-            <UInput v-model="localTodo.text" placeholder="やることを入力" @keydown.ctrl.enter="submit"/>
+            <UInput v-model="localTodo.text" placeholder="やることを入力" @keydown.ctrl.enter="submit" :color="errors.length > 0 ? 'error' : 'info'"  :highlight="errors.length > 0" />
             <USelect v-model="localTodo.status" :items="statusOptions" class="mb-2" />
             <USelect v-model="localTodo.priority" :items="priorityOptions" />
             </div>
@@ -33,6 +40,7 @@ import type {Todo, TodoStatus, TodoPriority} from '~/types/todo.ts'
 
 const statusOptions: TodoStatus[] = ['未対応', '対応中', '対応完了']
 const priorityOptions: TodoPriority[] = ['低', '中', '高']
+const errors = ref<string[]>([])
 
 const props = defineProps<{
     isOpen: boolean
@@ -47,13 +55,25 @@ const emit = defineEmits<{
 
 // ローカルコピ(入力中に親へ影響しないようにする)
 const localTodo = ref({...props.modelValue})
-
 watch(() => props.modelValue, (newVal) => {
     localTodo.value = {...newVal}
 })
 
+watch(() => props.isOpen, (newVal) => {
+    errors.value = []
+})
 const submit = () => {
+    errors.value = []
     if (localTodo.value.text.trim() === '') {
+        errors.value.push('Todoを入力してください。')
+    }
+    if (localTodo.value.status === null) {
+        errors.value.push('対応状況を選択してください。')
+    }
+    if (localTodo.value.priority === null) {
+        errors.value.push('対応状況を選択してください。')
+    }
+    if (errors.value.length > 0){
         return
     }
 
@@ -62,6 +82,7 @@ const submit = () => {
 }
 
 const close = () => {
+    errors.value = []
     emit('update:isOpen', false)
 }
 </script>
