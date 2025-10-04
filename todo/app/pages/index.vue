@@ -1,11 +1,4 @@
 <template>
-  <!-- TODO:うまく機能していない。 -->
-   <!-- <div>
-    <UButton
-      label="通知テスト"
-      @click="toast.add({ title: '通知OK！', description: 'これはテストです',  icon: 'i-lucide-check-circle-days',})"
-    />
-  </div> -->
   <div>
     <!-- 横並びにする -->
     <div class="flex gap-2">
