@@ -48,7 +48,7 @@ import { ref } from 'vue'
 import type { Todo } from '~/types/todo'
 import { DEFAULT_TODO } from '~/types/todo'
 import useTodos from '~/composables/useTodos'
-import TodoModal from '~/components/index/TodoModal.vue'
+import TodoModal from '~/components/TodoModal.vue'
 import TodoTable from '~/components/TodoTable.vue'
 import { useToast } from '#imports'
 
