@@ -60,25 +60,29 @@ const placeStone = (row: number, col: number) => {
         return
     }
 
+
+    // 指定した座標を中心として周りを検査する。
     let flipped = false
     for (const [dx, dy] of directions){
         const stones: [number, number][] = []
         let r = row + dy
         let c = col + dx
         while (r >= 0 && r < 8 && c >= 0 && c < 8) {
-        const cell = board.value[r]![c]
-        if (!cell) break
-        if (cell === turn.value) {
-            if (stones.length > 0) {
-            stones.forEach(([sr, sc]) => (board.value[sr]![sc] = turn.value))
-            flipped = true
+            const cell = board.value[r]![c]
+            if (!cell) {
+                break
             }
-            break
-        } else {
-            stones.push([r, c])
-        }
-        r += dy
-        c += dx
+            if (cell === turn.value) {
+                if (stones.length > 0) {
+                    stones.forEach(([sr, sc]) => (board.value[sr]![sc] = turn.value))
+                    flipped = true
+                }
+                break
+            } else {
+                stones.push([r, c])
+            }
+            r += dy
+            c += dx
         }
     }
 
@@ -86,12 +90,5 @@ const placeStone = (row: number, col: number) => {
         board.value[row]![col] = turn.value
         turn.value = turn.value === 'black' ? 'white' : 'black'
   }
-    
 }
 </script>
-
-<style>
-body {
-    background: #2d2d2d;
-}
-</style>
