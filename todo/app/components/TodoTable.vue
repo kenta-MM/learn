@@ -1,35 +1,28 @@
 <template>
     <div class="flex flex-col flex-1 w-full">
-        <div class="flex px-4 py-3.5 border-b border-accented">
+        <!-- 検索エリア -->
+        <div class="flex px-4 py-3.5 border-b border-accented gap-2">
             <UInput
-                :model-value="table?.tableApi?.getColumn('text')?.getFilterValue() as string"
+                :model-value="getFilterValue('text')"
                 class="max-w-sm"
-                placeholder="Filter texts..."
-                @update:model-value="table?.tableApi?.getColumn('text')?.setFilterValue($event)"
+                placeholder="内容で絞り込み..."
+                @update:model-value="setFilterValue('text', $event)"
             />
-            <USelectMenu
-                :v-model="table?.tableApi?.getColumn('status')?.getFilterValue() as string"
-                class="w-40"
+            <FilterSelect 
+                column-id="status"
+                label="進捗状態"
                 :items="['未対応', '対応中', '対応完了']"
-                multiple
-                placeholder="進捗状態"
-                @update:model-value="(val: string[]) => {
-                    const col = table?.tableApi?.getColumn('status')
-                    col?.setFilterValue(val.length > 0 ? val : undefined)
-                }"
+                :table="table"
             />
-            <USelectMenu
-                :v-model="table?.tableApi?.getColumn('priority')?.getFilterValue() as string"
-                class="w-40"
+            <FilterSelect 
+                column-id="priority"
+                label="優先度"
                 :items="['低', '中', '高']"
-                multiple
-                placeholder="優先度"
-                @update:model-value="(val: string[]) => {
-                    const col = table?.tableApi?.getColumn('priority')
-                    col?.setFilterValue(val.length > 0 ? val : undefined)
-                }"
-            />            
+                :table="table"
+            />
         </div>
+
+        <!-- テーブル本体 -->
         <div class="w-full space-y-4 pb-4">
             <UTable
                 ref="table"
@@ -46,6 +39,7 @@
             />
         </div>
         
+        <!-- ページネーション -->
         <div class="flex justify-center border-t border-default pt-4">
             <UPagination
                 :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
@@ -57,20 +51,19 @@
     </div>
 </template> 
 
-
 <script setup lang="ts">
 import type { Todo } from '~/types/todo'
 import type { TableColumn } from '@nuxt/ui';
 import type { Row } from '@tanstack/vue-table';
 import { getPaginationRowModel } from '@tanstack/vue-table';
+import FilterSelect from '~/components/FilterSelect.vue'
 
+// 共通コンポーネント
 const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')
 const UDropdownMenu = resolveComponent('UDropdownMenu')
 
-defineProps<{
-  todos: Todo[]
-}>()
+defineProps<{ todos: Todo[] }>()
 
 const emit = defineEmits<{
   (e: 'sort', key: keyof Todo): void
@@ -78,65 +71,51 @@ const emit = defineEmits<{
   (e: 'remove', index: number): void
 }>()
 
-// ソートの初期状態
-const sorting = ref([
-    {
-        id: 'priority',
-        desc: true
-    },
-])
-
-const columnFilters = ref([
-    {
-        id: 'text',
-        value: ''
-    }
-])
-
-const pagination = ref({
-        pageIndex: 0,
-        pageSize: 20
-    }
-)
-
+// 状態変数
+const sorting = ref([{ id: 'priority', desc: true }])
+const columnFilters = ref([{ id: 'text', value: '' }])
+const pagination = ref({ pageIndex: 0, pageSize: 20 })
 const table = useTemplateRef('table')
 
-const priorityMap: Record<string, number> = {
-    '高': 3,
-    '中': 2,
-    '低': 1,
+// ソート/フィルターの共通ロジック
+const priorityMap: Record<string, number> = { '高': 3, '中': 2,'低': 1 }
+const statusMap: Record<string, number> = { '対応完了': 3, '対応中': 2, '未対応': 1 }
+
+const getFilterValue = (key: string) => 
+    (table.value?.tableApi?.getColumn(key)?.getFilterValue() as string)  || ''
+
+const setFilterValue = (key: string, val: unknown) => {
+    const col = table.value?.tableApi?.getColumn(key)
+    col?.setFilterValue(val || undefined)
 }
 
-const statusMap: Record<string, number> = {
-    '対応完了': 3,
-    '対応中': 2,
-    '未対応': 1,
+// 共通 filterFn
+const arrayFilterFn = (row: Row<Todo>, columnId: string, filterValue: string[] | string) => {
+    if (Array.isArray(filterValue)) {
+        return filterValue.includes(row.getValue(columnId))
+    }
+    return row.getValue(columnId) === filterValue
 }
 
+// 共通 sortingFn
+const createSortingFn = (map: Record<string, number>) => {
+    return (row1: Row<Todo>, row2: Row<Todo>, columnId: string) => {
+        const a = map[row1.getValue(columnId) as string] ?? 0
+        const b = map[row2.getValue(columnId) as string] ?? 0
+        return a - b
+    }
+}
+
+// カラム定義
 const columns: TableColumn<Todo>[] = [
     {
         accessorKey: 'text',
         header: '内容',
-        cell: ({ row }) => { return row.getValue('text') }
+        cell: ({ row }) => { return row.getValue('text') },
     },
     {
         accessorKey: 'status',
-        header: ({ column }) => {
-            const isSorted = column.getIsSorted()
-
-            return h(UButton, {
-                color: 'neutral',
-                variant: 'ghost',
-                label: '進捗状態',
-                icon: isSorted
-                    ? isSorted === 'asc'
-                        ? 'i-lucide-arrow-up-narrow-wide'
-                        : 'i-lucide-arrow-down-wide-narrow'
-                    : 'i-lucide-arrow-up-down',
-                class: '-mx-2.5',
-                onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-            })
-        },
+        header: ({ column }) => createSortableHeader('進捗状態', column),
         cell: ({ row }) => {            
             const color = {
                 '未対応': 'neutral' as const,
@@ -144,38 +123,14 @@ const columns: TableColumn<Todo>[] = [
                 '対応完了': 'success' as const,
             }[row.getValue('status') as string]
 
-            return h(UBadge, {clasee: 'capitalize', variant: 'subtle', color }, () => row.getValue('status'))
+            return h(UBadge, {class: 'capitalize', variant: 'subtle', color }, () => row.getValue('status'))
         },
-        sortingFn: (row1, row2, columnId) => {
-            const a = statusMap[row1.getValue(columnId) as string] ?? 0
-            const b = statusMap[row2.getValue(columnId) as string] ?? 0
-            return a - b
-        },
-        filterFn: (row, columnId, filterValue: string[] | string) => {
-            if (Array.isArray(filterValue)) {
-                return filterValue.includes(row.getValue(columnId))
-            }
-            return row.getValue(columnId) === filterValue
-        },
+        sortingFn: createSortingFn(statusMap),
+        filterFn: arrayFilterFn,
     },
     {
         accessorKey: 'priority',
-        header: ({ column }) => {
-            const isSorted = column.getIsSorted()
-
-            return h(UButton, {
-                color: 'neutral',
-                variant: 'ghost',
-                label: '優先度',
-                icon: isSorted
-                    ? isSorted === 'asc'
-                        ? 'i-lucide-arrow-up-narrow-wide'
-                        : 'i-lucide-arrow-down-wide-narrow'
-                    : 'i-lucide-arrow-up-down',
-                class: '-mx-2.5',
-                onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-            })
-        },
+        header: ({ column }) => createSortableHeader('優先度', column),
         cell: ({ row }) => {
             const color = {
                 '低': 'neutral' as const,
@@ -185,17 +140,8 @@ const columns: TableColumn<Todo>[] = [
 
             return h(UBadge, {clasee: 'capitalize', variant: 'subtle', color }, () => row.getValue('priority'))
         },
-        sortingFn: (row1, row2, columnId) => {
-            const a = priorityMap[row1.getValue(columnId) as string] ?? 0
-            const b = priorityMap[row2.getValue(columnId) as string] ?? 0
-            return a - b
-        },
-        filterFn: (row, columnId, filterValue: string[] | string) => {
-            if (Array.isArray(filterValue)) {
-                return filterValue.includes(row.getValue(columnId))
-            }
-            return row.getValue(columnId) === filterValue
-        },        
+        sortingFn: createSortingFn(priorityMap),
+        filterFn: arrayFilterFn,   
     },
     {
         id: 'actions',
@@ -227,6 +173,7 @@ const columns: TableColumn<Todo>[] = [
     }
 ]
 
+// 共通関数
 function getRowItems(row: Row<Todo>){
     return [
         {
@@ -246,4 +193,23 @@ function getRowItems(row: Row<Todo>){
     ]
 }
 
+function createSortableHeader(label: string, column: any) {
+    const isSorted = column.getIsSorted()
+    let icon = ''
+    if (isSorted) {
+        icon =  isSorted === 'asc' ? 'i-lucide-arrow-up-narrow-wide' : 'i-lucide-arrow-down-wide-narrow'
+    } else {
+        icon = 'i-lucide-arrow-up-down'
+    }
+
+    return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label,
+        icon,
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+    })
+}
 </script>
+
