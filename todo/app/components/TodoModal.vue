@@ -8,7 +8,7 @@
         <!-- モーダルの中身 -->
         <template #body>
             <ul v-if="errors.length > 0">
-                <li v-for="error in errors">
+                <li v-for="[index, error] in errors.entries()" :key="index">
                     {{ error }}
                 </li>
 

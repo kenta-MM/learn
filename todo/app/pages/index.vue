@@ -29,9 +29,7 @@
  
     <TodoTable
       v-if="todos.length"
-      :todos="sortedTodos"
-      :sortAsc="sortAsc"
-      @sort="sortBy"
+      :todos="todos"
       @edit="openEdit"
       @remove="handleRemove"
     />
@@ -53,7 +51,7 @@ import TodoTable from '~/components/TodoTable.vue'
 import { useToast } from '#imports'
 
 const toast = useToast()
-const { todos, sortAsc, sortBy, sortedTodos, addTodo, updateTodo, removeTodo } = useTodos()  
+const { todos, addTodo, updateTodo, removeTodo } = useTodos()  
 
 const isOpenAdd = ref(false)
 const isOpenEdit = ref(false)
