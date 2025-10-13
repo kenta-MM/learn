@@ -20,7 +20,66 @@
                 :items="['低', '中', '高']"
                 :table="table"
             />
+
+            <UButton
+                icon="i-heroicons-cog-6-tooth"
+                variant="ghost"
+                color="neutral"
+                class="ml-auto"
+                title="設定"
+                @click="isSettingOpen = true"
+            />
         </div>
+
+        <!--設定モーダル -->
+        <UModal 
+            v-model:open="isSettingOpen"
+            title="設定"
+        >
+            <template #body>
+                <div class="space-y-4">
+                    <h3 class="text-base font-semibold">列の管理</h3>
+                    
+                    <!-- 既存列一覧 -->
+                    <div v-for="col in userColumns" :key="col.accessorKey" class="flex justify-between items-center border-b border-default pb-1">
+                        <span>{{ col.header }}</span>
+                        <UButton
+                            icon="i-heroicons-trash"
+                            color="red"
+                            variant="ghost"
+                            size="xs"
+                            @click="removeColumn(col.accessorKey)"
+                        />
+                    </div>
+                    
+                    <!-- 新しい列追加フォーム -->
+                    <div class="flex items-center gap-2 mt-2">
+                    <UInput v-model="newColumn" placeholder="新しい列名を入力" class="flex-1" />
+                    <USelect
+                        v-model="newColumnType"
+                        v-bind:items="[
+                            {label: 'テキスト', value: 'text'},
+                            {label: '数値', value: 'number'},
+                            {label: '日付', value: 'date'},
+                            {label: 'フラグ', value: 'flag'},
+                        ]"
+                        class="w-32"
+                        placeholder="型"
+                    />
+                    <UButton icon="i-heroicons-plus" color="primary" @click="addColumn">追加</UButton>
+                    </div>
+                </div>
+            </template> 
+
+            <template #fotter>
+                <UButton
+                    color="neutral"
+                    variant="soft"
+                    @click="isSettingOpen = false"
+                    label="閉じる"
+                />
+            </template>
+        </UModal>        
 
         <!-- テーブル本体 -->
         <div class="w-full space-y-4 pb-4">
@@ -62,6 +121,7 @@ import FilterSelect from '~/components/FilterSelect.vue'
 const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')
 const UDropdownMenu = resolveComponent('UDropdownMenu')
+const UInput = resolveComponent('UInput')
 
 defineProps<{ todos: Todo[] }>()
 
@@ -106,8 +166,32 @@ const createSortingFn = (map: Record<string, number>) => {
     }
 }
 
-// カラム定義
-const columns: TableColumn<Todo>[] = [
+type CustomColumnType = 'text' | 'number' | 'date' | 'flag'
+
+interface UserColumn {
+    accessorKey: string
+    header: string
+    type: CustomColumnType
+    cell: any
+}
+// 設定関連の状態
+const isSettingOpen = ref(false)
+const userColumns = ref<UserColumn[]>([])
+const newColumn = ref('')
+const newColumnType = ref<CustomColumnType | undefined>(undefined)
+
+// 型ラベルを日本度で表示
+function typeLabel(type: CustomColumnType) {
+    return ({
+        text: 'テキスト',
+        number: '数値',
+        date: '日付',
+        flag: 'フラグ',
+    }[type] || '')
+
+}
+// ベース列（削除対象外）
+const baseColumns: TableColumn<Todo>[] = [
     {
         accessorKey: 'text',
         header: '内容',
@@ -138,40 +222,74 @@ const columns: TableColumn<Todo>[] = [
                 '高': 'error' as const,
             }[row.getValue('priority') as string]
 
-            return h(UBadge, {clasee: 'capitalize', variant: 'subtle', color }, () => row.getValue('priority'))
+            return h(UBadge, {class: 'capitalize', variant: 'subtle', color }, () => row.getValue('priority'))
         },
         sortingFn: createSortingFn(priorityMap),
         filterFn: arrayFilterFn,   
     },
-    {
-        id: 'actions',
-        cell: ({ row }) => {
-            return h(
-                'div',
-                { class: 'text-right' },
-                h(
-                    UDropdownMenu,
-                    {
-                        content: {
-                            align: 'end',
-                        },
-                        items: getRowItems(row),
-                        'aria-label': 'Action dropdown'
-                    },
-                    () => h(
-                        UButton, {
-                            icon: 'i-lucide-ellipsis-vertical',
-                            color: 'neutral',
-                            variant: 'ghost',
-                            class: 'ml-auto',
-                            'aria-label': 'Actions dropdown',
-                        }
-                    )
-                )
-            )
-        }
-    }
 ]
+
+
+// アクション列
+const actionColumn: TableColumn<Todo> = {
+    id: 'actions',
+    cell: ({ row }) =>
+        h('div', { class: 'text-right' },
+            h(UDropdownMenu, {
+                content: { align: 'end' },
+                items: getRowItems(row),
+            },
+            () => h(UButton, {
+                icon: 'i-lucide-ellipsis-vertical',
+                color: 'neutral',
+                variant: 'ghost',
+                class: 'ml-auto',
+            }))
+        )
+}
+
+// カラム管理
+const columns = computed(() => [...baseColumns, ...userColumns.value, actionColumn])
+
+function addColumn() {
+    const key = newColumn.value.trim()
+    const type = newColumnType.value
+
+    if(!newColumn.value || !type) return
+    if (userColumns.value.some(c => c.accessorKey === key)) return;
+
+    userColumns.value.push({
+        accessorKey: key,
+        header: key,
+        type: type,
+        cell: ({ row }: any) => renderCell(row, key, type),
+    })
+    newColumn.value = ''
+    newColumnType.value = undefined
+}
+
+// セル描画
+function renderCell(row: any, key: string, type: CustomColumnType) {
+    const value = row.getValue(key)
+
+    switch (type) {
+        case 'number':
+            return h('span', value ?? '0')
+        case 'date':
+            return h('span', value ? new Date(value).toLocaleDateString() : '')
+        case 'flag':
+            return h('input', {
+                type: 'checkbox',
+                checked: !!value,
+                disabled: true
+            })
+    }
+}
+
+
+function removeColumn(key: string) {
+  userColumns.value = userColumns.value.filter(c => c.accessorKey  !== key)
+}
 
 // 共通関数
 function getRowItems(row: Row<Todo>){
