@@ -34,9 +34,6 @@ board.value[3]![4] = 'black'
 board.value[4]![3] = 'black'
 board.value[4]![4] = 'white'
 
-// todo:確認用
-console.log(board.value)
-
 const turn = ref<'black' | 'white'>('black')
 
 // ボードを１次元にして表示用にする
